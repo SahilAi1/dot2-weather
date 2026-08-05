@@ -1,148 +1,120 @@
 # Dot2 Weather
 
-A small full-stack weather application built with Flask and a React frontend. Search for a city, region, or postal code to see current weather, including temperature, humidity, wind, and conditions.
+A small full-stack weather web app that lets a user search for a city, region, or postal code and see its current weather.
 
 **Live demo:** [my-app-u9mb.onrender.com](https://my-app-u9mb.onrender.com)
 
-## Features
+## What the app does
 
-- Search weather by city, region, or postal code
-- Live current-weather data from [WeatherAPI.com](https://www.weatherapi.com/)
-- Flask API backend and React frontend
-- API key stays on the server; it is never sent to the browser
-- Docker-ready deployment
+The page accepts a location such as `London`, `Tokyo`, or a postal code. It then shows the current temperature, feels-like temperature, humidity, wind speed, local time, and a weather-condition icon.
 
-## Tech stack
+The API key is handled only by the backend. The browser never receives it.
 
-- Python 3.14+
-- Flask
-- React (loaded in the browser)
-- [uv](https://docs.astral.sh/uv/) for Python dependency management
-- Docker
+## How it works
 
-## Prerequisites
+```text
+Browser
+  │  GET /api/weather?q=London
+  ▼
+Flask app (main.py)
+  │  Uses private api_key environment variable
+  ▼
+WeatherAPI.com
+  │  Current-weather JSON
+  ▼
+Flask returns JSON to the browser
+  ▼
+React renders the weather card
+```
 
-Install the following before running the project locally:
+### Frontend
 
-- [Python 3.14+](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- A free [WeatherAPI.com](https://www.weatherapi.com/signup.aspx) account and API key
+The UI lives in `frontend/` and uses React in the browser.
 
-Docker is optional, but required for the Docker instructions below.
+- `frontend/index.html` loads the page and React dependencies.
+- `frontend/app.jsx` manages the location input, loading state, errors, quick-city buttons, and the weather result card.
+- `frontend/style.css` provides the visual styling.
 
-## Get your own WeatherAPI key
+When the user submits a location, `app.jsx` calls:
 
-1. Go to [WeatherAPI.com sign-up](https://www.weatherapi.com/signup.aspx) and create an account.
-2. In the WeatherAPI dashboard, copy your API key.
-3. From the project root, create your private environment file:
+```text
+/api/weather?q=<location>
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+Using a relative URL means the frontend works both locally and on Render without hard-coding a server address.
 
-4. Open `.env` and replace the placeholder value:
+### Backend
 
-   ```dotenv
-   api_key=your_actual_weatherapi_com_key
-   ```
+`main.py` is a Flask server. It has two responsibilities:
 
-`api_key` must stay lowercase because that is the environment-variable name used by `main.py`.
+1. Serve the frontend files at `/`.
+2. Provide `/api/weather` as a small backend proxy for WeatherAPI.com.
 
-> Never commit `.env`. It is excluded by both `.gitignore` and `.dockerignore`. Commit `.env.example` only.
+The endpoint validates that a location query was supplied, forwards the request to WeatherAPI.com, and returns the JSON response. If WeatherAPI.com returns an error, the backend passes a readable error message to the frontend.
 
-## Run locally with uv
+### API-key security
 
-1. Clone the repository and enter it:
+The backend reads the WeatherAPI key from an environment variable named `api_key`:
 
-   ```bash
-   git clone https://github.com/YOUR_GITHUB_USERNAME/dot2-weather.git
-   cd dot2-weather
-   ```
+```python
+API_KEY = os.getenv("api_key")
+```
 
-2. Create `.env` using the steps above.
-3. Install the locked dependencies:
+For local development, the value is kept in a private `.env` file. The repository includes `.env.example` as a safe template, while `.gitignore` prevents the real `.env` file from being committed. The Docker build also excludes `.env`, so the key is not baked into an image.
 
-   ```bash
-   uv sync --frozen
-   ```
+To use your own key, create a free account at [WeatherAPI.com](https://www.weatherapi.com/signup.aspx), then create a local `.env` file:
 
-4. Start the app:
+```dotenv
+api_key=your_weatherapi_com_key
+```
 
-   ```bash
-   uv run main.py
-   ```
+## Docker and Render
 
-5. Visit [http://localhost:8000](http://localhost:8000) in your browser.
+The `Dockerfile` packages the app with Python and `uv`, installs the dependencies locked in `uv.lock`, and starts Flask with:
 
-To stop the server, press `Ctrl+C` in the terminal.
+```text
+uv run main.py
+```
 
-## Run with Docker
+The app listens on the port in the `PORT` environment variable. It defaults to `8000` locally, while Render supplies `PORT` automatically in production.
 
-1. Create `.env` as described in [Get your own WeatherAPI key](#get-your-own-weatherapi-key).
-2. Build the image:
-
-   ```bash
-   docker build -t dot2-weather .
-   ```
-
-3. Run the container and pass the API key securely from `.env`:
-
-   ```bash
-   docker run --rm --env-file .env -p 8000:8000 dot2-weather
-   ```
-
-4. Visit [http://localhost:8000](http://localhost:8000).
-
-Do not use `--build-arg` for the API key, and do not put the key in the Dockerfile. The `.dockerignore` file prevents `.env` from being copied into the image build context.
-
-## Environment variables
-
-| Name | Required | Description |
-| --- | --- | --- |
-| `api_key` | Yes | Your private WeatherAPI.com API key. |
-| `PORT` | No | Server port. Defaults to `8000`; Render provides this automatically. |
-
-## Deploying to Render
-
-The live version is deployed at [https://my-app-u9mb.onrender.com](https://my-app-u9mb.onrender.com).
-
-For a new Render deployment:
-
-1. Create a new **Web Service** and connect this GitHub repository.
-2. Use `Docker` as the environment so Render uses the included `Dockerfile`.
-3. In **Environment**, add a secret environment variable named `api_key` and paste your WeatherAPI key as its value.
-4. Deploy. Render supplies `PORT` automatically.
-
-Never add the API key to the GitHub repository or Render build arguments.
+On Render, set `api_key` as a secret environment variable in the service settings. Do not place the key in the repository, the Dockerfile, or a Docker build argument.
 
 ## Project structure
 
 ```text
 .
-├── frontend/          # React UI, styles, and HTML entry point
-├── main.py            # Flask server and /api/weather endpoint
-├── Dockerfile         # Container build and startup instructions
-├── .env.example       # Safe API-key template
-├── pyproject.toml     # Python project metadata and dependencies
-└── uv.lock            # Locked dependency versions
+├── frontend/
+│   ├── app.jsx          # Search behaviour and weather-card rendering
+│   ├── index.html       # Browser entry point
+│   └── style.css         # UI styling
+├── main.py              # Flask server and WeatherAPI proxy endpoint
+├── Dockerfile            # Production container configuration
+├── .env.example          # Safe example of required environment variables
+├── pyproject.toml        # Python dependencies and project metadata
+└── uv.lock               # Reproducible dependency lockfile
+```
+
+## Run locally
+
+```bash
+uv sync --frozen
+uv run main.py
+```
+
+Then open [http://localhost:8000](http://localhost:8000). You need a valid `.env` file first.
+
+## Run with Docker
+
+```bash
+docker build -t dot2-weather .
+docker run --rm --env-file .env -p 8000:8000 dot2-weather
 ```
 
 ## Troubleshooting
 
-### `Environment variable api_key is required.`
-
-Create `.env` from `.env.example` and make sure it contains a valid `api_key` value.
-
-### WeatherAPI returns an error
-
-Check that your API key is active, has not exceeded its quota, and that the location query is valid.
-
-### Docker does not load the key
-
-Confirm that `.env` is in the project root and that you started the container with `--env-file .env`.
-
-## Security notes
-
-- Keep `.env` private.
-- Use a separate API key for public deployments if possible.
-- If a key is ever committed or shared accidentally, revoke it in WeatherAPI.com and create a new one immediately.
+| Problem | Likely cause | Fix |
+| --- | --- | --- |
+| `Environment variable api_key is required.` | `.env` is missing or uses the wrong variable name. | Create `.env` from `.env.example` and use lowercase `api_key`. |
+| Weather search returns an error. | Invalid, inactive, or quota-limited WeatherAPI key. | Check the key in the WeatherAPI dashboard. |
+| The Render deployment cannot load weather data. | `api_key` is not set in Render. | Add it as a secret environment variable and redeploy. |
