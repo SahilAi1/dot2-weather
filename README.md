@@ -2,7 +2,6 @@
 
 A small full-stack weather web app that lets a user search for a city, region, or postal code and see its current weather.
 
-**Live demo:** [my-app-u9mb.onrender.com](https://my-app-u9mb.onrender.com)
 
 ## What the app does
 
